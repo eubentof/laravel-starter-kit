@@ -14,7 +14,8 @@ final class FormFieldRegistry
         return match ($field->type) {
             FormFieldType::Number, FormFieldType::LinearScale, FormFieldType::Classification => is_numeric($value) ? $value + 0 : $value,
             FormFieldType::Agreement, FormFieldType::Checkbox => filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? $value,
-            FormFieldType::MultipleChoice, FormFieldType::ProvidedMultipleSelect, FormFieldType::ProvidedPickList, FormFieldType::ChoiceGrid => is_array($value) ? array_values($value) : $value,
+            FormFieldType::ChoiceGrid => $this->normalizeChoiceGrid($field, $value),
+            FormFieldType::MultipleChoice, FormFieldType::ProvidedMultipleSelect, FormFieldType::ProvidedPickList => is_array($value) ? array_values($value) : $value,
             FormFieldType::Text, FormFieldType::Email, FormFieldType::Url, FormFieldType::RichText, FormFieldType::Textarea, FormFieldType::DateTime, FormFieldType::Phone => is_string($value) ? trim($value) : $value,
             default => $value,
         };
@@ -48,6 +49,12 @@ final class FormFieldRegistry
             }
 
             $resolved[$field->key] = $fieldRules;
+            if ($field->type === FormFieldType::ChoiceGrid && $this->hasStructuredGrid($field)) {
+                $this->addStructuredGridRules($resolved, $field);
+
+                continue;
+            }
+
             $optionValues = array_map(fn ($option) => $option->value, $field->options);
             if ($optionValues !== [] && in_array($field->type, [FormFieldType::SingleChoice, FormFieldType::CardSelection], true)) {
                 $resolved[$field->key][] = Rule::in($optionValues);
@@ -58,5 +65,64 @@ final class FormFieldRegistry
         }
 
         return $resolved;
+    }
+
+    private function normalizeChoiceGrid(FormFieldData $field, mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        if (! $this->hasStructuredGrid($field) || array_is_list($value)) {
+            return array_values($value);
+        }
+
+        return array_map(
+            fn (mixed $rowValue): mixed => is_array($rowValue) ? array_values($rowValue) : $rowValue,
+            $value,
+        );
+    }
+
+    /** @param array<string, list<mixed>> $rules */
+    private function addStructuredGridRules(array &$rules, FormFieldData $field): void
+    {
+        $columns = $this->settingOptionValues($field, 'columns');
+        $requiresEveryRow = ($field->settings['requireEveryRow'] ?? false) === true;
+        $allowsMultiple = ($field->settings['multiple'] ?? false) === true;
+
+        foreach ($this->settingOptionValues($field, 'rows') as $row) {
+            $key = "{$field->key}.{$row}";
+            $presenceRule = $requiresEveryRow ? 'required' : 'nullable';
+
+            if ($allowsMultiple) {
+                $rules[$key] = [$presenceRule, 'array'];
+                $rules["{$key}.*"] = [Rule::in($columns)];
+            } else {
+                $rules[$key] = [$presenceRule, Rule::in($columns)];
+            }
+        }
+    }
+
+    private function hasStructuredGrid(FormFieldData $field): bool
+    {
+        return $this->settingOptionValues($field, 'rows') !== []
+            && $this->settingOptionValues($field, 'columns') !== [];
+    }
+
+    /** @return list<string|int> */
+    private function settingOptionValues(FormFieldData $field, string $key): array
+    {
+        $options = $field->settings[$key] ?? [];
+        if (! is_array($options)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            static fn (mixed $option): string|int|null => is_array($option)
+                && (is_string($option['value'] ?? null) || is_int($option['value'] ?? null))
+                    ? $option['value']
+                    : null,
+            $options,
+        ), static fn (mixed $value): bool => $value !== null));
     }
 }

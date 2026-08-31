@@ -47,7 +47,7 @@ export const Money = {
     },
 };
 export const DateAndTime = {
-    args: { field: field('date_time'), modelValue: new Date() },
+    args: { field: field('date_time'), modelValue: '2026-08-31T14:30' },
 };
 export const Phone = { args: { field: field('phone'), modelValue: '+351' } };
 export const Agreement = {
@@ -55,12 +55,6 @@ export const Agreement = {
 };
 export const Checkbox = {
     args: { field: field('checkbox'), modelValue: false },
-};
-export const Rating = {
-    args: {
-        field: { ...field('rating'), settings: { stars: 5 } },
-        modelValue: 3,
-    },
 };
 export const SingleChoice = {
     args: { field: choiceField('single_choice'), modelValue: null },

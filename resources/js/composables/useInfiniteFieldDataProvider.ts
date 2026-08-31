@@ -12,6 +12,7 @@ export function useInfiniteFieldDataProvider(
     const loading = ref(false);
     const error = ref<string | null>(null);
     let requestSequence = 0;
+    let hydrationSequence = 0;
     let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
     const merge = (incoming: FieldOptionData[]) => {
@@ -23,7 +24,7 @@ export function useInfiniteFieldDataProvider(
     };
 
     const load = async (reset = false) => {
-        if (loading.value || (!reset && !hasMore.value)) return;
+        if ((!reset && loading.value) || (!reset && !hasMore.value)) return;
         if (reset) {
             page.value = 1;
             hasMore.value = true;
@@ -63,12 +64,52 @@ export function useInfiniteFieldDataProvider(
         }
     };
 
+    const hydrate = async () => {
+        const sequence = ++hydrationSequence;
+        const selectedValues = (
+            Array.isArray(modelValue.value)
+                ? modelValue.value
+                : [modelValue.value]
+        ).filter(
+            (value): value is string | number =>
+                typeof value === 'string' || typeof value === 'number',
+        );
+        if (selectedValues.length === 0) return;
+
+        const params = new URLSearchParams();
+        selectedValues.forEach((value) =>
+            params.append('values[]', String(value)),
+        );
+        try {
+            const response = await fetch(
+                `/api/field-data/${provider.value}?${params}`,
+            );
+            if (!response.ok)
+                throw new Error('Unable to resolve selected options.');
+            const payload = (await response.json()) as {
+                data: FieldOptionData[];
+            };
+            if (sequence === hydrationSequence) merge(payload.data);
+        } catch (reason) {
+            if (sequence === hydrationSequence) {
+                error.value =
+                    reason instanceof Error
+                        ? reason.message
+                        : 'Unable to resolve selected options.';
+            }
+        }
+    };
+
     watch(search, () => {
         clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => void load(true), 300);
     });
 
     watch(provider, () => void load(true), { immediate: true });
+    watch([provider, modelValue], () => void hydrate(), {
+        deep: true,
+        immediate: true,
+    });
     onBeforeUnmount(() => clearTimeout(debounceTimer));
 
     return {
@@ -79,6 +120,7 @@ export function useInfiniteFieldDataProvider(
         error,
         loadMore: () => load(false),
         refresh: () => load(true),
+        hydrate,
         modelValue,
     };
 }

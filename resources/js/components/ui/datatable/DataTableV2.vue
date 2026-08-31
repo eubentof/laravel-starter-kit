@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import DataTableCell from '@/components/ui/datatable/DataTableCell.vue';
-import ProvidedSelectInput from '@/components/ui/primitives/ProvidedSelectInput.vue';
+import ProvidedSelectInput from '@/components/ui/primitives/select/ProvidedSelectInput/ProvidedSelectInput.vue';
 import type { DataTableSchemaData } from '@/types/generated';
 import Column from 'primevue/column';
 import DataTable, { type DataTableCellEditCompleteEvent, type DataTableSortEvent } from 'primevue/datatable';

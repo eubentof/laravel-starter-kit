@@ -97,7 +97,7 @@ lint:
 [group('Quality')]
 [doc('Check Gherkin scenarios, Pest descriptions, and documented steps with Gherkish.')]
 gherkish *args:
-    php artisan gherkish:check {{args}}
+    docker compose exec app php artisan gherkish:check {{args}}
 
 [group('Quality')]
 [doc('Check Gherkin scenarios, Pest descriptions, and documented steps with Gherkish.')]
