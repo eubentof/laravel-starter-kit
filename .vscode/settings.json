@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "Justfile": "just",
+        "justfile": "just"
+    }
+}
